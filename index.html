@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRAWLSPACE</title>
+  <link rel="stylesheet" href="css/menu.css">
+</head>
+<body>
+  <div class="scene" aria-hidden="true"></div>
+  <main>
+    <div>
+      <h1>CRAWLSPACE</h1>
+    </div>
+    <div class="sub">The Hollow</div>
+    <nav aria-label="Main menu">
+      <button id="btn-continue" hidden>Continue Expedition</button>
+      <button id="btn-new">New Expedition</button>
+      <button disabled>Multiplayer<small>In development (needs server, see CHECKLIST.md)</small></button>
+      <button disabled>Tutorial<small>In development</small></button>
+      <button id="btn-settings">Settings</button>
+      <button id="btn-credits">Credits</button>
+      <button id="btn-quit">Quit</button>
+    </nav>
+  </main>
+  <button id="btn-fullscreen" class="corner secondary">Fullscreen</button>
+
+  <div class="modal" id="modal-settings" hidden>
+    <div class="panel" role="dialog" aria-label="Settings">
+      <h2>Settings</h2>
+      <div id="settings-body"></div>
+      <p><button class="close">Close</button></p>
+    </div>
+  </div>
+  <div class="modal" id="modal-credits" hidden>
+    <div class="panel credits" role="dialog" aria-label="Credits">
+      <h2>Credits</h2>
+      <p>CRAWLSPACE is a work in progress. Rendering: Three.js.</p>
+      <p><button class="close">Close</button></p>
+    </div>
+  </div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

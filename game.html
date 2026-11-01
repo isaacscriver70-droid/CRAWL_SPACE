@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CRAWLSPACE - Expedition</title>
+  <link rel="stylesheet" href="css/game.css">
+  <script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  } }
+  </script>
+</head>
+<body>
+  <canvas id="view"></canvas>
+  <div id="dot"></div>
+  <a class="back" href="index.html">Main Menu</a>
+  <div id="loading"><div id="loading-text">Loading expedition…</div></div>
+  <div id="start" hidden>
+    <h2>The Hollow Expedition Base</h2>
+    <p id="controls-list"></p>
+    <p>Explore the camp and the cliff-side pool. The cave itself is not built yet (Stage 3).</p>
+    <div class="hint">Click to begin</div>
+  </div>
+  <div id="fatal" hidden><div id="fatal-msg"></div><a class="back" style="position:static" href="index.html">Return to Main Menu</a></div>
+  <script type="module" src="js/game.js"></script>
+</body>
+</html>
