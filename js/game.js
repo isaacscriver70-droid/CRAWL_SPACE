@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { getSettings, onSettingsChange } from './settings.js';
 import { loadProgress } from './save.js';
-import { buildWorld } from './world.js';
+import { buildWorld, LOCATIONS } from './world.js';
 import { FirstPersonController } from './movement.js';
 import { keyName } from './ui.js';
 
@@ -24,12 +24,24 @@ async function boot() {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(getSettings().fov, 1, 0.05, 600);
 
-  $('loading-text').textContent = 'Building terrain…';
+  $('loading-text').textContent = 'Carving the cave…';
   await new Promise(r => setTimeout(r, 40));            // let the loading screen paint before heavy work
   const world = buildWorld(scene);
   const player = new FirstPersonController(camera, canvas, world, locked => {
     document.body.classList.toggle('playing', locked); $('start').hidden = locked;
   });
+
+  // Developer options: ?at=<location id> teleports for inspection, ?fly=1 enables collision-free flight.
+  const params = new URLSearchParams(location.search), at = LOCATIONS.find(l => l.id === params.get('at'));
+  if (at) { player.pos.x = at.pos[0]; player.pos.y = at.pos[1]; player.pos.z = at.pos[2]; player.yaw = Math.PI; }
+  player.fly = params.get('fly') === '1' || (!!at && params.get('fly') !== '0');
+
+  // Handheld light (first version; the 3D flashlight object, scattering and sediment come in Stage 6)
+  const torch = new THREE.SpotLight(0xfff0d8, 120, 50, 0.42, 0.55, 2);
+  torch.position.set(0.18, -0.12, 0); torch.target.position.set(0, 0, -6); torch.castShadow = getSettings().graphics !== 'low';
+  torch.shadow.mapSize.set(1024, 1024); torch.shadow.camera.near = 0.1; torch.shadow.camera.far = 50; torch.shadow.bias = -0.0005;
+  camera.add(torch, torch.target); scene.add(camera);
+  addEventListener('keydown', e => { if (player.locked && e.code === getSettings().bindings.flashlight && !e.repeat) torch.visible = !torch.visible; });
 
   const ratio = () => ({ low: 0.75, medium: 1, high: Math.min(devicePixelRatio, 2) })[getSettings().graphics] ?? 1;
   function resize() {

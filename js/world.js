@@ -46,18 +46,17 @@ function makeTex({ base, v = 40, scale = 6, oct = 4, stretch = 1, size = 256, re
 const std = (map, o = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.9, ...o });
 
 /* ---------- terrain definition ---------- */
-export const WATER_Y = -0.9;
+import { WATER_Y, buildCave, LOCATIONS, noise3 } from './cave.js';
+export { WATER_Y, LOCATIONS };
 const POOL = { x: 0, z: -38 };
 const WALL_Z = -47; // front face of the cliff
 export function terrainHeight(x, z) {
-  const d = Math.hypot(x, z + 10);
-  let h = (fbm(x * 0.03, z * 0.03) - 0.4) * 18 * sstep(28, 70, d) + (fbm(x * 0.15, z * 0.15) - 0.5) * 0.25;
-  h += sstep(-57, -70, z) * (22 + fbm(x * 0.05, z * 0.05) * 6);
+  const d = Math.hypot(x, z + 22);                                   // the camp sits in a small rocky bowl
+  let h = (fbm(x * 0.03, z * 0.03) - 0.4) * 8 * sstep(30, 70, d) + sstep(27, 35, d) * (13 + fbm(x * 0.08, z * 0.08) * 9) + (fbm(x * 0.15, z * 0.15) - 0.5) * 0.25;
   const pd = Math.hypot(x - POOL.x, z - POOL.z);
   const bowl = 1 - sstep(4, 9.5, pd);
   const channel = (1 - sstep(2.5, 3.5, Math.abs(x))) * sstep(-34, -38, z);
-  h -= 3.1 * Math.max(bowl, channel);
-  return h;
+  return h - 3.1 * Math.max(bowl, channel);
 }
 const DOCK = { minX: -1.2, maxX: 1.2, minZ: -35, maxZ: -27, y: 0.12 };
 
@@ -107,7 +106,8 @@ export function buildWorld(scene) {
   const moon = new THREE.Mesh(new THREE.SphereGeometry(14, 24, 16), new THREE.MeshBasicMaterial({ color: 0xdfe8f5, fog: false }));
   moon.position.copy(moonDir).multiplyScalar(400); scene.add(moon);
 
-  scene.add(new THREE.HemisphereLight(0x5f82a8, 0x1a2418, 0.7));
+  const hemi = new THREE.HemisphereLight(0x5f82a8, 0x1a2418, 0.7); scene.add(hemi);
+  const caveAmbient = new THREE.AmbientLight(0x6f8fa8, 0); scene.add(caveAmbient);
   const sun = new THREE.DirectionalLight(0x9db8e0, 1.9);
   sun.position.set(-20, 30, 28); sun.target.position.set(0, 0, -22);
   sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
@@ -165,20 +165,47 @@ export function buildWorld(scene) {
     cols.set(c, i * 3);
   }
   tg.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  { const ia = tg.index.array, keep = []; for (let i = 0; i < ia.length; i += 3) { const cz = (tp.getZ(ia[i]) + tp.getZ(ia[i + 1]) + tp.getZ(ia[i + 2])) / 3; if (cz > WALL_Z + 0.8) keep.push(ia[i], ia[i + 1], ia[i + 2]); } tg.setIndex(keep); }
   add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, map: T.ground, bumpMap: T.ground, bumpScale: 1.2, roughness: 1 })), { cast: false });
 
   /* --- cliff face with cave mouth (opening 5 m wide, 3.5 m above the waterline) --- */
-  const wallMat = M.rock, OW = 2.5, TOP = 2.6;
+  const wallMat = M.rock, OW = 9, TOP = 9;
   const left = rockBox(110 - OW, 28, 6, 96, 28, 3, [-(110 + OW) / 2, 10, WALL_Z - 3], wallMat);
   const right = rockBox(110 - OW, 28, 6, 96, 28, 3, [(110 + OW) / 2, 10, WALL_Z - 3], wallMat);
-  const lintel = rockBox(OW * 2, 24 - TOP, 6, 8, 20, 3, [0, (TOP + 24) / 2, WALL_Z - 3], wallMat, 0.5);
-  const back = rockBox(OW * 2 + 0.4, 28, 1.5, 8, 28, 2, [0, 10, WALL_Z - 6.75], wallMat, 0.4);
-  [left, right, lintel, back].forEach(m => { scene.add(m); solid(m); });
+  const lintel = rockBox(OW * 2, 24 - TOP, 6, 18, 15, 3, [0, (TOP + 24) / 2, WALL_Z - 3], wallMat, 0.5);
+  [left, right, lintel].forEach(m => { scene.add(m); solid(m); });
+
+
+  /* --- the cave: SDF mesh whose mouth plugs the hole in the cliff face --- */
+  const faceK = (x, y) => 0.7 * (fbm(x * 0.35 + WALL_Z * 0.2, y * 0.35 + 3.1) - 0.5) * 2;   // same displacement as the cliff slabs
+  const cave = buildCave({ outside: (x, y, z) => z - (WALL_Z + faceK(x, y)) + 0.12, stopZ: WALL_Z - 0.5,
+    plug: { minX: -9.4, maxX: 9.4, minY: -4.5, maxY: 9.4, minZ: WALL_Z - 2, maxZ: WALL_Z + 1.2 } });
+  const cg = new THREE.BufferGeometry();
+  cg.setAttribute('position', new THREE.BufferAttribute(cave.positions, 3)); cg.setIndex(new THREE.BufferAttribute(cave.indices, 1));
+  cg.computeVertexNormals();
+  { const p = cg.attributes.position, nrm = cg.attributes.normal, n = p.count, col = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), nx = nrm.getX(i), ny = nrm.getY(i), nz = nrm.getZ(i);
+      const ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+      if (ay >= ax && ay >= az) { uv[i * 2] = x / 3; uv[i * 2 + 1] = z / 3; } else if (ax >= az) { uv[i * 2] = z / 3; uv[i * 2 + 1] = y / 3; } else { uv[i * 2] = x / 3; uv[i * 2 + 1] = y / 3; }
+      const strata = noise3(x * 0.25, y * 1.4, z * 0.25), mineral = sstep(0.6, 0.78, noise3(x * 0.6 + 7, y * 0.6, z * 0.6) * 0.6 + noise3(x * 1.7, y * 1.7, z * 1.7) * 0.4);
+      let c = [0.27 + strata * 0.1, 0.235 + strata * 0.09, 0.185 + strata * 0.07];                  // limestone, banded
+      c = c.map((v, k) => v + ([0.5, 0.47, 0.42][k] - v) * mineral * 0.7);                            // pale mineral deposits
+      const wet = 1 - sstep(WATER_Y + 0.2, WATER_Y + 1.8, y); c = c.map((v, k) => v * (1 - 0.45 * wet) + [0.0, 0.012, 0.006][k] * wet);   // dark, wet near and below the waterline
+      const floor = sstep(0.55, 0.85, ny); c = c.map((v, k) => v + ([0.2, 0.17, 0.13][k] - v) * floor * 0.8);                                // silty sediment on floors
+      col.set(c, i * 3);
+    }
+    cg.setAttribute('color', new THREE.BufferAttribute(col, 3)); cg.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); }
+  cg.computeBoundingSphere();
+  const caveMesh = new THREE.Mesh(cg, new THREE.MeshStandardMaterial({ vertexColors: true, map: T.rock, bumpMap: T.rock, bumpScale: 2.5, roughness: 0.55, metalness: 0.02 }));
+  caveMesh.receiveShadow = false; caveMesh.castShadow = false; scene.add(caveMesh);
 
   /* --- water --- */
   const wMat = new THREE.MeshStandardMaterial({ color: 0x0a3a46, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.86, bumpMap: T.water, bumpScale: 0.5 });
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(24, 28), wMat);
-  water.rotation.x = -Math.PI / 2; water.position.set(0, WATER_Y, -40); water.receiveShadow = true; scene.add(water);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(24, WALL_Z * -1 - 26.1 - 0.3), wMat);       // pool in front of the cliff
+  water.rotation.x = -Math.PI / 2; water.position.set(0, WATER_Y, (-26.1 + WALL_Z + 0.3) / 2); water.receiveShadow = true; scene.add(water);
+  const caveWater = new THREE.Mesh(new THREE.PlaneGeometry(110, 232), wMat.clone());               // one water table through the whole cave
+  caveWater.material.side = THREE.DoubleSide; caveWater.rotation.x = -Math.PI / 2; caveWater.position.set(-20, WATER_Y, WALL_Z + 0.3 - 116); scene.add(caveWater);
 
   /* --- dock (cave access) --- */
   const dock = new THREE.Group();
@@ -206,7 +233,7 @@ export function buildWorld(scene) {
   for (let i = 0; i < 3; i++) { const l = box(0.62, 1.95, 0.52, M.locker, -2.3 + i * 0.66, 0.975, -2.15); canopy.add(l); }
   canopy.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true; });
   scene.add(canopy);
-  solid(table.children[0].parent, 0); // table footprint
+  solid(table, 0);
   canopy.children.filter(c => c.geometry && c.geometry.parameters.height === 2.7 || (c.geometry && c.geometry.parameters.height === 1.95)).forEach(c => solid(c, 0.05));
 
   // Research tent with survey station
@@ -258,26 +285,35 @@ export function buildWorld(scene) {
   const trunkG = new THREE.CylinderGeometry(0.14, 0.26, 3.2, 7); trunkG.translate(0, 1.6, 0); paintGeo(trunkG, [0.2, 0.14, 0.1]);
   const crowns = [[1.9, 2.4, 2.3], [1.5, 2.2, 3.5], [1.05, 2.0, 4.6]].map(([r, h, y]) => { const c = new THREE.ConeGeometry(r, h, 8); c.translate(0, y, 0); return paintGeo(c, [0.07, 0.17, 0.1]); });
   const treeG = mergeGeometries([trunkG, ...crowns]);
-  const treeSpots = scatter(treeG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), 110, 900,
-    (x, z) => free(x, z, 34) && Math.hypot(x, z + 10) < 118 && slopeAt(x, z) < 0.55,
+  const treeSpots = scatter(treeG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), 28, 1500,
+    (x, z) => Math.hypot(x, z + 22) > 37 && Math.hypot(x, z + 22) < 62 && z > WALL_Z + 3 && slopeAt(x, z) < 0.6,
     (x, z) => { const s = 0.8 + R() * 0.9; return { y: terrainHeight(x, z) - 0.1, sx: s, sy: s, sz: s }; });
   treeSpots.forEach(([x, z]) => colliders.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3, minY: -50, maxY: 50 }));
-  scatter(new THREE.IcosahedronGeometry(0.8, 1), new THREE.MeshStandardMaterial({ color: 0x20381f, roughness: 1, flatShading: true }), 90, 600,
-    (x, z) => free(x, z, 14) && slopeAt(x, z) < 0.6, (x, z) => { const s = 0.5 + R() * 0.8; return { y: terrainHeight(x, z) + 0.25 * s, sx: s * 1.3, sy: s * 0.7, sz: s * 1.3 }; });
+  scatter(new THREE.IcosahedronGeometry(0.8, 1), new THREE.MeshStandardMaterial({ color: 0x20381f, roughness: 1, flatShading: true }), 30, 600,
+    (x, z) => free(x, z, 14) && Math.hypot(x, z + 22) < 40 && slopeAt(x, z) < 0.6, (x, z) => { const s = 0.5 + R() * 0.8; return { y: terrainHeight(x, z) + 0.25 * s, sx: s * 1.3, sy: s * 0.7, sz: s * 1.3 }; });
   const rg = new THREE.IcosahedronGeometry(1, 1), rp = rg.attributes.position;
   for (let i = 0; i < rp.count; i++) { const k = 0.75 + hash2(rp.getX(i) * 9, rp.getZ(i) * 9 + rp.getY(i) * 5) * 0.5; rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k * 0.8, rp.getZ(i) * k); }
   rg.computeVertexNormals();
-  scatter(rg, M.rock, 90, 1200, (x, z) => (Math.hypot(x, z + 10) > 9) && z > WALL_Z + 1.5 && Math.hypot(x - POOL.x, z - POOL.z) > 9.8 && !(Math.abs(x) < 2.5 && z < 8 && z > -27),
+  scatter(rg, M.rock, 55, 1200, (x, z) => (Math.hypot(x, z + 22) < 38) && (Math.hypot(x, z + 10) > 9) && z > WALL_Z + 1.5 && Math.hypot(x - POOL.x, z - POOL.z) > 9.8 && !(Math.abs(x) < 2.5 && z < 8 && z > -27),
     (x, z) => { const s = 0.25 + R() * R() * 1.6; return { y: terrainHeight(x, z) + s * 0.3, sx: s * 1.2, sy: s, sz: s * 1.1, rx: R(), rz: R() }; });
 
   /* --- API --- */
-  const groundHeight = (x, z) => (x > DOCK.minX && x < DOCK.maxX && z > DOCK.minZ && z < DOCK.maxZ) ? DOCK.y : terrainHeight(x, z);
+  const CAVE_Z = WALL_Z + 0.2;                          // beyond this plane the world is the cave
+  const groundHeight = (x, z, y = 0) => {
+    if (z < CAVE_Z) { const f = cave.floorBelow(x, y + 0.7, z, 8); return f === null ? -99 : f; }
+    return (x > DOCK.minX && x < DOCK.maxX && z > DOCK.minZ && z < DOCK.maxZ) ? DOCK.y : terrainHeight(x, z);
+  };
+  const hemiBase = hemi.intensity, sunBase = sun.intensity, fogOut = new THREE.Color(FOG), fogIn = new THREE.Color(0x03070a);
   return {
-    colliders, groundHeight, bound: 105, spawn: { x: 0, z: 6, yaw: 0 },
+    colliders, groundHeight, cave, caveZ: CAVE_Z, bound: 60, spawn: { x: 0, z: 2, yaw: 0 }, stats: cave.stats,
     update(dt, camera) {
       sky.position.copy(camera.position); stars.position.copy(camera.position); moon.position.copy(camera.position).addScaledVector(moonDir, 400);
       T.water.offset.x += dt * 0.012; T.water.offset.y += dt * 0.007;
       lanternLight.intensity = 7 + Math.sin(performance.now() * 0.011) * 0.25 + Math.sin(performance.now() * 0.0047) * 0.2;
+      // fade moon/sky light out as the player goes underground; the cave gets only a faint ambient
+      const d = Math.min(1, Math.max(0, (WALL_Z + 1 - camera.position.z) / 5));
+      sun.intensity = sunBase * (1 - d); hemi.intensity = hemiBase * (1 - d); caveAmbient.intensity = 0.32 * d;
+      scene.fog.density = 0.013 + 0.07 * d; scene.fog.color.copy(fogOut).lerp(fogIn, d); scene.background.copy(scene.fog.color);
     }
   };
 }

@@ -8,7 +8,8 @@ const SPEED = { crouch: 1.7, walk: 3.4, sprint: 5.9 };
 export class FirstPersonController {
   constructor(camera, canvas, world, onLockChange = () => {}) {
     this.camera = camera; this.canvas = canvas; this.world = world; this.onLockChange = onLockChange;
-    this.pos = { x: world.spawn.x, y: world.groundHeight(world.spawn.x, world.spawn.z), z: world.spawn.z };
+    this.pos = { x: world.spawn.x, y: world.groundHeight(world.spawn.x, world.spawn.z, 5), z: world.spawn.z };
+    this.fly = false;
     this.vel = { x: 0, y: 0, z: 0 };
     this.yaw = world.spawn.yaw; this.pitch = 0;
     this.eye = STAND_EYE; this.crouching = false; this.onGround = true;
@@ -33,26 +34,41 @@ export class FirstPersonController {
   lock() { this.canvas.requestPointerLock?.(); }
 
   blocked(nx, nz, fromX, fromZ) {
-    const w = this.world;
-    if (Math.abs(nx) > w.bound || Math.abs(nz) > w.bound) return true;
-    const g1 = w.groundHeight(nx, nz), g0 = w.groundHeight(fromX, fromZ);
+    const w = this.world, y = this.pos.y;
+    if (Math.abs(nx) > w.bound && nz > w.caveZ || nz > 60) return true;
+    const g1 = w.groundHeight(nx, nz, y), g0 = w.groundHeight(fromX, fromZ, y);
     const dist = Math.hypot(nx - fromX, nz - fromZ) || 1e-6;
     // probe 0.5 m ahead so tiny steps cannot creep up a cliff: more than 0.45 m rise over 0.5 m is too steep
-    const ahead = w.groundHeight(fromX + (nx - fromX) / dist * 0.5, fromZ + (nz - fromZ) / dist * 0.5);
+    const ahead = w.groundHeight(fromX + (nx - fromX) / dist * 0.5, fromZ + (nz - fromZ) / dist * 0.5, y);
     if (this.onGround && ahead - g0 > 0.45) return true;
-    if (g1 < -1.6 && this.onGround) return true;                                              // water deeper than wading depth
-    const top = this.pos.y + (this.crouching ? 1.2 : 1.8);
+    if (g1 < -1.6 && this.onGround) return true;                                              // water deeper than wading depth (swimming arrives in Stage 4)
+    if (nz < w.caveZ) {                                                                       // cave: clearance comes from the cave field itself
+      for (const h of [0.65, 1.2, this.crouching ? 1.05 : 1.55]) if (w.cave.sdf(nx, y + h, nz) < RADIUS) return true;
+      return false;
+    }
+    const top = y + (this.crouching ? 1.2 : 1.8);
     for (const c of w.colliders) {
-      if (top < c.minY || this.pos.y > c.maxY - 0.3) continue;
+      if (top < c.minY || y > c.maxY - 0.3) continue;
       if (nx > c.minX - RADIUS && nx < c.maxX + RADIUS && nz > c.minZ - RADIUS && nz < c.maxZ + RADIUS) return true;
     }
     return false;
   }
 
+  // Developer free-fly (URL ?fly=1): ignores collision so the whole cave can be inspected.
+  updateFly(dt, k) {
+    const sp = k('sprint') ? 22 : 7, f = (k('forward') ? 1 : 0) - (k('backward') ? 1 : 0), s = (k('right') ? 1 : 0) - (k('left') ? 1 : 0), u = (k('jump') ? 1 : 0) - (k('crouch') ? 1 : 0);
+    const cp = Math.cos(this.pitch), sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
+    this.pos.x += (-sin * cp * f + cos * s) * sp * dt; this.pos.z += (-cos * cp * f - sin * s) * sp * dt; this.pos.y += (Math.sin(this.pitch) * f + u) * sp * dt;
+    this.vel.x = this.vel.y = this.vel.z = 0; this.onGround = false; this.crouching = false; this.sprinting = false; this.eye = 0;
+    this.camera.position.set(this.pos.x, this.pos.y, this.pos.z); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+  }
+
   update(dt) {
     dt = Math.min(dt, 0.05);
     const b = getSettings().bindings, k = a => this.keys.has(b[a]);
-    this.crouching = k('crouch') && this.onGround ? true : (this.crouching && !this.onGround);
+    const lowCeiling = this.pos.z < this.world.caveZ && this.world.cave.sdf(this.pos.x, this.pos.y + 1.72, this.pos.z) < 0.12;
+    this.crouching = (k('crouch') || lowCeiling) && this.onGround ? true : (this.crouching && !this.onGround);
+    if (this.fly) return this.updateFly(dt, k);
     const f = (k('forward') ? 1 : 0) - (k('backward') ? 1 : 0), s = (k('right') ? 1 : 0) - (k('left') ? 1 : 0);
     this.sprinting = k('sprint') && f > 0 && !this.crouching && this.onGround;
     const target = this.crouching ? SPEED.crouch : this.sprinting ? SPEED.sprint : SPEED.walk;
@@ -70,7 +86,7 @@ export class FirstPersonController {
     if (!this.blocked(this.pos.x, nz, this.pos.x, this.pos.z)) this.pos.z = nz; else this.vel.z = 0;
 
     // vertical
-    const ground = this.world.groundHeight(this.pos.x, this.pos.z);
+    const ground = this.world.groundHeight(this.pos.x, this.pos.z, this.pos.y);
     this.pos.y += this.vel.y * dt;
     if (this.pos.y <= ground) { this.pos.y = ground; this.vel.y = 0; this.onGround = true; }
     else if (this.onGround && this.pos.y - ground < 0.4 && this.vel.y <= 0) { this.pos.y = ground; this.vel.y = 0; }  // follow descending slopes
