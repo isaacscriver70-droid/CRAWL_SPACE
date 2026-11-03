@@ -5,6 +5,8 @@ import { loadProgress } from './save.js';
 import { buildWorld, LOCATIONS } from './world.js';
 import { FirstPersonController } from './movement.js';
 import { keyName } from './ui.js';
+import { DiveState, Bubbles } from './underwater.js';
+import { WATER_LEVEL } from './cave.js';
 
 const $ = id => document.getElementById(id);
 function fail(msg) { $('loading').hidden = true; $('fatal-msg').textContent = msg; $('fatal').hidden = false; }
@@ -37,7 +39,7 @@ async function boot() {
   player.fly = params.get('fly') === '1' || (!!at && params.get('fly') !== '0');
 
   // Handheld light (first version; the 3D flashlight object, scattering and sediment come in Stage 6)
-  const torch = new THREE.SpotLight(0xfff0d8, 120, 50, 0.42, 0.55, 2);
+  const torch = new THREE.SpotLight(0xfff0d8, 320, 60, 0.45, 0.5, 1.6);
   torch.position.set(0.18, -0.12, 0); torch.target.position.set(0, 0, -6); torch.castShadow = getSettings().graphics !== 'low';
   torch.shadow.mapSize.set(1024, 1024); torch.shadow.camera.near = 0.1; torch.shadow.camera.far = 50; torch.shadow.bias = -0.0005;
   camera.add(torch, torch.target); scene.add(camera);
@@ -56,11 +58,25 @@ async function boot() {
   $('start').addEventListener('click', () => player.lock());
   $('loading').hidden = true; $('start').hidden = false;
 
+  const dive = new DiveState(), bubbles = new Bubbles(scene);
+  const hud = { air: $('o2bar'), airTxt: $('o2txt'), depth: $('depth'), press: $('press'), warn: $('warn'), uw: $('uw') };
+  const underColor = new THREE.Color(0x06222b);
+  $('hud').hidden = false;
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     if (player.locked) player.update(dt); else player.update(0.0001);
     world.update(dt, camera);
+    if (!player.fly) dive.update(player.locked ? dt : 0, camera.position.y, player.speed);
+    bubbles.update(dt, camera, dive.submerged);
+    if (dive.submerged) {                                             // underwater look: dense blue-green fog, darker with depth
+      scene.fog.color.copy(underColor); scene.fog.density = 0.075 + dive.depth * 0.002; scene.background.copy(underColor);
+    }
+    hud.uw.style.opacity = dive.submerged ? 1 : 0;
+    hud.air.style.width = dive.air.toFixed(0) + '%'; hud.air.className = dive.air < 15 ? 'crit' : dive.air < 30 ? 'low' : '';
+    hud.airTxt.textContent = dive.air.toFixed(0) + '%'; hud.depth.textContent = dive.depth.toFixed(1) + ' m';
+    hud.press.textContent = dive.pressure.toFixed(2) + ' bar'; hud.warn.textContent = dive.warning;
+    if (dive.dead && $('dead').hidden) { $('dead').hidden = false; document.exitPointerLock?.(); }
     renderer.render(scene, camera);
   });
 }

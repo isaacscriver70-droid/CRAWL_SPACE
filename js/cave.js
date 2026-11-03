@@ -72,9 +72,9 @@ function crom(a, b, c, d, t) { const t2 = t * t, t3 = t2 * t; return 0.5 * (2 * 
 export function buildCave(opts) {
   const t0 = Date.now();
   const SEG = [];                                        // [ax,ay,az,bx,by,bz,rh0,rh1,rv0,rv1]
-  let pathLength = 0;
+  let pathLength = 0; const paths = [];
   for (const chain of CHAINS) {
-    const P = chain.map(id => N[id]);
+    const P = chain.map(id => N[id]), pts = []; paths.push(pts);
     for (let i = 0; i < P.length - 1; i++) {
       const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
       const n = Math.max(2, Math.ceil(Math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]) / 0.7));
@@ -83,6 +83,7 @@ export function buildCave(opts) {
         const t = k / n, q = [0, 1, 2, 3, 4].map(j => crom(p0[j], p1[j], p2[j], p3[j], t));
         const m = 0.9 + 0.2 * noise3(q[0] * 0.21, q[1] * 0.21, q[2] * 0.21), m2 = 0.9 + 0.2 * noise3(q[2] * 0.19 + 9, q[0] * 0.19, q[1] * 0.19);
         q[3] = Math.max(0.42, q[3] * m); q[4] = Math.max(0.42, q[4] * m2);
+        pts.push([q[0], q[1], q[2]]);
         if (prev) { SEG.push([prev[0], prev[1], prev[2], q[0], q[1], q[2], prev[3], q[3], prev[4], q[4]]); pathLength += Math.hypot(q[0] - prev[0], q[1] - prev[1], q[2] - prev[2]); }
         prev = q;
       }
@@ -198,7 +199,7 @@ export function buildCave(opts) {
   let openCorners = 0; const cols = new Set();
   for (const key of list) { const k = key % 2048, j = ((key - k) / 2048) % 512, i = ((key - k) / 2048 - j) / 512; const [x, y, z] = wp(i, j, k); if (z < (opts.stopZ ?? -47) && vals[slot(key)] > 0) { openCorners++; cols.add(i * 4096 + k); } }
   return {
-    positions: new Float32Array(verts), indices: new Uint32Array(idx), sdf, inside, floorBelow, wp, nodes: N,
+    positions: new Float32Array(verts), indices: new Uint32Array(idx), paths, sdf, inside, floorBelow, wp, nodes: N,
     stats: { segments: S, pathLength, openVolume: openCorners * H ** 3, footprintArea: cols.size * H * H, vertices: verts.length / 3, triangles: idx.length / 3, buildMs: Date.now() - t0, corners: list.length }
   };
 }

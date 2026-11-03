@@ -8,7 +8,7 @@ Statuses: Not started / In progress / Implemented / Tested and verified / Blocke
 | 1 | Project structure + navigation + settings/save/menu | Implemented (not yet browser-tested) |
 | 2 | Expedition base + land movement | Implemented (not browser-tested; movement logic unit-tested headlessly) |
 | 3 | Cave environment | Implemented, geometry verified headlessly; visuals not seen. See Stage 3 notes. 85%-underground rule NOT met yet |
-| 4 | Swimming, oxygen, depth, pressure | Not started |
+| 4 | Swimming, oxygen, depth, pressure | Implemented, headless-tested; not seen in a browser. Sediment, light scattering, surface entry/exit animation still missing |
 | 5 | Player body + skeletal animation | Not started |
 | 6 | Flashlight + sediment | Not started |
 | 7-8 | Creature, rig, AI | Not started |
@@ -28,8 +28,17 @@ Statuses: Not started / In progress / Implemented / Tested and verified / Blocke
 | game.html, css/game.css, js/game.js | Implemented (renderer, loading screen, click-to-start, settings applied) |
 | js/world.js | Implemented, visually unverified: terrain, sky/moon/stars, cliff face, pool + dock, canopy with prep table/lockers/lantern, research tent with survey screen, supply stack, 2 floodlights, trees/bushes/rocks. Textures are procedural, not photographic |
 | js/cave.js | Implemented: enclosed cave as a signed-distance field meshed with surface nets (183k triangles, builds in ~2-3 s). 47 waypoints, 9 of the 10 regions, alternate route, loop and dead ends |
+| js/swimming.js, js/underwater.js | Implemented: 3D swimming (momentum, drag, neutral buoyancy, collision against the cave field, slides along walls, floats at the surface with head 0.25 m above water), air/depth/pressure state, exhaled bubbles, game-over when air hits 0 |
 | js/movement.js | Implemented: walk, sprint (5.9 vs 3.4 m/s), crouch, jump, collision, slope blocking, wading limit, head bob/FOV kick respecting settings. Headless test: wall stop, cliff block, jump/land OK |
 | All other spec files | Not created yet. Files are only added when they contain real functionality. |
+
+## Stage 4 notes (swimming), headless results
+- Bug fixes after your report: jumping no longer bypasses collision (cliff face, steep ridges, deep water, rock). Walking into the cliff stops at least 0.2 m from the face. Jump test results: cliff face stop, ridge stop, mouth swim-in OK.
+- A scripted diver swam the whole main route from the pool to The Hollow (about 200 s) without getting stuck, through every squeeze. Air fell from 100% to 34% at the Hollow, with refills on the dry camp ledge.
+- Air: 15 minutes at the surface at light effort, drains faster with depth (pressure) and effort. It refills only when your head is in air. At 0 you get the EXPEDITION LOST screen.
+- Controls: swim along your view direction with W/S, A/D strafe, Space up, C down, Shift to kick harder. Wading out onto ledges works.
+- Cave readability: brighter rock, stronger light (F toggles), less fog. Underwater: blue-green fog and a tint.
+- Not done: sediment, scattering, 3D flashlight, regulator sounds (no audio yet), equipment condition on the HUD.
 
 ## Stage 3 notes (cave)
 Measured by tests on the generated geometry (headless; not by eye):

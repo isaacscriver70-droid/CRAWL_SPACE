@@ -15,13 +15,25 @@
 <body>
   <canvas id="view"></canvas>
   <div id="dot"></div>
+  <div id="uw"></div>
+  <div id="hud" hidden>
+    <div class="row"><span>AIR</span><div class="bar"><i id="o2bar"></i></div><b id="o2txt"></b></div>
+    <div class="row"><span>DEPTH</span><b id="depth"></b></div>
+    <div class="row"><span>PRESSURE</span><b id="press"></b></div>
+    <div id="warn"></div>
+  </div>
   <a class="back" href="index.html">Main Menu</a>
   <div id="loading"><div id="loading-text">Loading expedition…</div></div>
   <div id="start" hidden>
     <h2>The Hollow Expedition Base</h2>
     <p id="controls-list"></p>
-    <p>Explore the camp and the cliff-side pool. The cave itself is not built yet (Stage 3).</p>
+    <p>Swim into the cave through the pool. Space = swim up, C = swim down, F = light.</p>
     <div class="hint">Click to begin</div>
+  </div>
+  <div id="dead" hidden>
+    <h2>EXPEDITION LOST</h2>
+    <p>You ran out of air.</p>
+    <p><a class="btn" href="game.html">Restart</a> <a class="btn" href="index.html">Main Menu</a></p>
   </div>
   <div id="fatal" hidden><div id="fatal-msg"></div><a class="back" style="position:static" href="index.html">Return to Main Menu</a></div>
   <script type="module" src="js/game.js"></script>

@@ -56,7 +56,7 @@ export function terrainHeight(x, z) {
   const pd = Math.hypot(x - POOL.x, z - POOL.z);
   const bowl = 1 - sstep(4, 9.5, pd);
   const channel = (1 - sstep(2.5, 3.5, Math.abs(x))) * sstep(-34, -38, z);
-  return h - 3.1 * Math.max(bowl, channel);
+  return h - 3.1 * Math.max(bowl, channel) - 1.2 * sstep(-42, -46, z) * (1 - sstep(2.5, 3.5, Math.abs(x)));
 }
 const DOCK = { minX: -1.2, maxX: 1.2, minZ: -35, maxZ: -27, y: 0.12 };
 
@@ -165,7 +165,7 @@ export function buildWorld(scene) {
     cols.set(c, i * 3);
   }
   tg.setAttribute('color', new THREE.BufferAttribute(cols, 3));
-  { const ia = tg.index.array, keep = []; for (let i = 0; i < ia.length; i += 3) { const cz = (tp.getZ(ia[i]) + tp.getZ(ia[i + 1]) + tp.getZ(ia[i + 2])) / 3; if (cz > WALL_Z + 0.8) keep.push(ia[i], ia[i + 1], ia[i + 2]); } tg.setIndex(keep); }
+  { const ia = tg.index.array, keep = []; for (let i = 0; i < ia.length; i += 3) { const cz = (tp.getZ(ia[i]) + tp.getZ(ia[i + 1]) + tp.getZ(ia[i + 2])) / 3; if (cz > WALL_Z - 0.5) keep.push(ia[i], ia[i + 1], ia[i + 2]); } tg.setIndex(keep); }
   add(new THREE.Mesh(tg, new THREE.MeshStandardMaterial({ vertexColors: true, map: T.ground, bumpMap: T.ground, bumpScale: 1.2, roughness: 1 })), { cast: false });
 
   /* --- cliff face with cave mouth (opening 5 m wide, 3.5 m above the waterline) --- */
@@ -193,7 +193,7 @@ export function buildWorld(scene) {
       c = c.map((v, k) => v + ([0.5, 0.47, 0.42][k] - v) * mineral * 0.7);                            // pale mineral deposits
       const wet = 1 - sstep(WATER_Y + 0.2, WATER_Y + 1.8, y); c = c.map((v, k) => v * (1 - 0.45 * wet) + [0.0, 0.012, 0.006][k] * wet);   // dark, wet near and below the waterline
       const floor = sstep(0.55, 0.85, ny); c = c.map((v, k) => v + ([0.2, 0.17, 0.13][k] - v) * floor * 0.8);                                // silty sediment on floors
-      col.set(c, i * 3);
+      col.set(c.map(v => v * 1.8), i * 3);
     }
     cg.setAttribute('color', new THREE.BufferAttribute(col, 3)); cg.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); }
   cg.computeBoundingSphere();
@@ -201,7 +201,7 @@ export function buildWorld(scene) {
   caveMesh.receiveShadow = false; caveMesh.castShadow = false; scene.add(caveMesh);
 
   /* --- water --- */
-  const wMat = new THREE.MeshStandardMaterial({ color: 0x0a3a46, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.86, bumpMap: T.water, bumpScale: 0.5 });
+  const wMat = new THREE.MeshStandardMaterial({ color: 0x0a3a46, roughness: 0.06, metalness: 0.25, transparent: true, opacity: 0.86, bumpMap: T.water, bumpScale: 0.5, side: THREE.DoubleSide });
   const water = new THREE.Mesh(new THREE.PlaneGeometry(24, WALL_Z * -1 - 26.1 - 0.3), wMat);       // pool in front of the cliff
   water.rotation.x = -Math.PI / 2; water.position.set(0, WATER_Y, (-26.1 + WALL_Z + 0.3) / 2); water.receiveShadow = true; scene.add(water);
   const caveWater = new THREE.Mesh(new THREE.PlaneGeometry(110, 232), wMat.clone());               // one water table through the whole cave
@@ -298,22 +298,22 @@ export function buildWorld(scene) {
     (x, z) => { const s = 0.25 + R() * R() * 1.6; return { y: terrainHeight(x, z) + s * 0.3, sx: s * 1.2, sy: s, sz: s * 1.1, rx: R(), rz: R() }; });
 
   /* --- API --- */
-  const CAVE_Z = WALL_Z + 0.2;                          // beyond this plane the world is the cave
+  const CAVE_Z = WALL_Z + 0.9;                          // beyond this plane the world is the cave
   const groundHeight = (x, z, y = 0) => {
     if (z < CAVE_Z) { const f = cave.floorBelow(x, y + 0.7, z, 8); return f === null ? -99 : f; }
     return (x > DOCK.minX && x < DOCK.maxX && z > DOCK.minZ && z < DOCK.maxZ) ? DOCK.y : terrainHeight(x, z);
   };
   const hemiBase = hemi.intensity, sunBase = sun.intensity, fogOut = new THREE.Color(FOG), fogIn = new THREE.Color(0x03070a);
   return {
-    colliders, groundHeight, cave, caveZ: CAVE_Z, bound: 60, spawn: { x: 0, z: 2, yaw: 0 }, stats: cave.stats,
+    colliders, groundHeight, terrain: terrainHeight, cave, caveZ: CAVE_Z, bound: 60, spawn: { x: 0, z: 2, yaw: 0 }, stats: cave.stats,
     update(dt, camera) {
       sky.position.copy(camera.position); stars.position.copy(camera.position); moon.position.copy(camera.position).addScaledVector(moonDir, 400);
       T.water.offset.x += dt * 0.012; T.water.offset.y += dt * 0.007;
       lanternLight.intensity = 7 + Math.sin(performance.now() * 0.011) * 0.25 + Math.sin(performance.now() * 0.0047) * 0.2;
       // fade moon/sky light out as the player goes underground; the cave gets only a faint ambient
       const d = Math.min(1, Math.max(0, (WALL_Z + 1 - camera.position.z) / 5));
-      sun.intensity = sunBase * (1 - d); hemi.intensity = hemiBase * (1 - d); caveAmbient.intensity = 0.32 * d;
-      scene.fog.density = 0.013 + 0.07 * d; scene.fog.color.copy(fogOut).lerp(fogIn, d); scene.background.copy(scene.fog.color);
+      sun.intensity = sunBase * (1 - d); hemi.intensity = hemiBase * (1 - d); caveAmbient.intensity = 0.55 * d;
+      scene.fog.density = 0.013 + 0.03 * d; scene.fog.color.copy(fogOut).lerp(fogIn, d); scene.background.copy(scene.fog.color);
     }
   };
 }
