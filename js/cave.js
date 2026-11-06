@@ -66,11 +66,48 @@ export const NODES = N;
 
 function crom(a, b, c, d, t) { const t2 = t * t, t3 = t2 * t; return 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (-a + 3 * b - 3 * c + d) * t3); }
 
+
+/* ---------- procedurally grown side branches (deterministic): narrow winding passages, small chambers, a few air domes ---------- */
+let BRANCHED = false;
+function addBranches() {
+  if (BRANCHED) return; BRANCHED = true;
+  let seed = 20240611; const R = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const occ = new Map(), key = (x, y, z) => `${Math.floor(x / 3)},${Math.floor(y / 3)},${Math.floor(z / 3)}`;
+  const add = p => { const k = key(p[0], p[1], p[2]); if (!occ.has(k)) occ.set(k, []); occ.get(k).push(p); };
+  const near = (q, r, skip) => { const cx = Math.floor(q[0] / 3), cy = Math.floor(q[1] / 3), cz = Math.floor(q[2] / 3);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (let k = -1; k <= 1; k++) { const l = occ.get(`${cx + i},${cy + j},${cz + k}`); if (l) for (const p of l) if (!(skip && skip.includes(p)) && Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) < r) return true; } return false; };
+  for (const ch of CHAINS) for (let i = 0; i < ch.length - 1; i++) { const a = N[ch[i]], b = N[ch[i + 1]], n = Math.ceil(Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) / 1.5); for (let k = 0; k <= n; k++) add([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n, a[2] + (b[2] - a[2]) * k / n]); }
+  const sources = ['B2', 'B4', 'C1', 'D2', 'E8', 'F0', 'G2', 'G4', 'H1', 'H4', 'I2', 'X2', 'X4', 'X5', 'B5', 'G1'];
+  let bi = 0;
+  for (const src of sources) for (let rep = 0; rep < 1; rep++) {
+    const s = N[src]; let heading = [Math.cos(R() * 6.28), 0, Math.sin(R() * 6.28)], p = [s[0], s[1], s[2]], own = [], ids = [src], rh = 0.8 + R() * 0.45, steps = 10 + Math.floor(R() * 12), made = 0;
+    for (let i = 0; i < steps; i++) {
+      let ok = false, q;
+      for (let t = 0; t < 10 && !ok; t++) {
+        const yaw = (R() - 0.5) * (t < 5 ? 0.9 : 2.2), pit = Math.max(-0.45, Math.min(0.45, (R() - 0.5) * 0.5 + (p[1] > -2 ? -0.1 : 0) + (p[1] < -30 ? 0.15 : 0)));
+        const cy = Math.cos(yaw), sy = Math.sin(yaw), h = [heading[0] * cy - heading[2] * sy, 0, heading[0] * sy + heading[2] * cy], hl = Math.hypot(h[0], h[2]) || 1;
+        const d = [h[0] / hl * Math.cos(pit), Math.sin(pit), h[2] / hl * Math.cos(pit)]; q = [p[0] + d[0] * 3.4, p[1] + d[1] * 3.4, p[2] + d[2] * 3.4];
+        if (q[0] < -68 || q[0] > 36 || q[2] > -56 || q[2] < -282 || q[1] > 0.4 || q[1] < -34) continue;
+        if (near(q, i < 3 ? 1.8 : 3.6, own.slice(-3))) continue;
+        heading = [d[0], 0, d[2]]; ok = true;
+      }
+      if (!ok) break;
+      rh = Math.max(0.75, Math.min(1.25, rh + (R() - 0.5) * 0.35)); const rv = Math.max(0.62, rh * (0.75 + R() * 0.2)), id = `g${bi}_${i}`;
+      N[id] = [q[0], q[1], q[2], rh, rv]; ids.push(id); add(q); own.push(q); p = q; made++;
+    }
+    if (made < 4) { ids.slice(1).forEach(id => delete N[id]); continue; }
+    const last = N[ids[ids.length - 1]], kind = R();
+    if (kind < 0.35) { last[3] = 2.1 + R() * 0.8; last[4] = 1.4 + R() * 0.5; }                                    // a small chamber at the end
+    else if (kind < 0.55 && last[1] < -2) { last[1] = 0.3; last[3] = 1.2; last[4] = 1.25; N[ids[ids.length - 2]][1] = (N[ids[ids.length - 2]][1] + 0.3) / 2; }   // an air dome
+    CHAINS.push(ids); bi++;
+  }
+}
+
 /* ---------- build ---------- */
 // opts.outside(x,y,z): extra free-space field (the open air in front of the cliff)
 // opts.plug: AABB of cells to evaluate around the cave mouth
 export function buildCave(opts) {
-  const t0 = Date.now();
+  const t0 = Date.now(); addBranches();
   const SEG = [];                                        // [ax,ay,az,bx,by,bz,rh0,rh1,rv0,rv1]
   let pathLength = 0; const paths = [];
   for (const chain of CHAINS) {
@@ -83,7 +120,7 @@ export function buildCave(opts) {
         const t = k / n, q = [0, 1, 2, 3, 4].map(j => crom(p0[j], p1[j], p2[j], p3[j], t));
         const m = 0.9 + 0.2 * noise3(q[0] * 0.21, q[1] * 0.21, q[2] * 0.21), m2 = 0.9 + 0.2 * noise3(q[2] * 0.19 + 9, q[0] * 0.19, q[1] * 0.19);
         q[3] = Math.max(0.42, q[3] * m); q[4] = Math.max(0.42, q[4] * m2);
-        pts.push([q[0], q[1], q[2]]);
+        pts.push([q[0], q[1], q[2], q[3], q[4]]);
         if (prev) { SEG.push([prev[0], prev[1], prev[2], q[0], q[1], q[2], prev[3], q[3], prev[4], q[4]]); pathLength += Math.hypot(q[0] - prev[0], q[1] - prev[1], q[2] - prev[2]); }
         prev = q;
       }
@@ -142,7 +179,7 @@ export function buildCave(opts) {
   const H = 0.25, ox = Math.floor(minX / H) * H, oy = Math.floor(minY / H) * H, oz = Math.floor(minZ / H) * H;
   const dimY = Math.ceil((maxY - oy) / H) + 4, dimZ = Math.ceil((maxZ - oz) / H) + 4;
   if (dimY >= 512 || dimZ >= 2048) throw new Error('cave grid too large');
-  const CAP = 1 << 22, keys = new Int32Array(CAP).fill(-1), vals = new Float32Array(CAP), list = [];
+  const CAP = 1 << 23, keys = new Int32Array(CAP).fill(-1), vals = new Float32Array(CAP), list = [];
   const kk = (i, j, k) => (i * 512 + j) * 2048 + k;
   const slot = key => { let s = (Math.imul(key, 2654435761) >>> 10) & (CAP - 1); while (keys[s] !== -1 && keys[s] !== key) s = (s + 1) & (CAP - 1); return s; };
   const wp = (i, j, k) => [ox + i * H, oy + j * H, oz + k * H];

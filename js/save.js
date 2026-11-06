@@ -4,7 +4,7 @@ const KEY = 'crawlspace.progress.v1';
 export const EMPTY_PROGRESS = () => ({
   version: 1, startedAt: null, updatedAt: null,
   discoveredLocations: [], evidence: [], recordersFound: [],
-  storyFlags: {}, endingsSeen: []
+  storyFlags: {}, endingsSeen: [], survey: [], bestDepth: 0
 });
 
 export function loadProgress() {

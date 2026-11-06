@@ -15,34 +15,7 @@ function fbm(x, y, o = 4) { let s = 0, a = 0.5, f = 1; for (let i = 0; i < o; i+
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 
-/* ---------- tileable procedural textures ---------- */
-function pnoise(x, y, px, py) {
-  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
-  const w = (i, p) => ((i % p) + p) % p;
-  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-  const a = hash2(w(xi, px), w(yi, py)), b = hash2(w(xi + 1, px), w(yi, py));
-  const c = hash2(w(xi, px), w(yi + 1, py)), d = hash2(w(xi + 1, px), w(yi + 1, py));
-  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
-}
-function makeTex({ base, v = 40, scale = 6, oct = 4, stretch = 1, size = 256, rep = [1, 1], paint = null, srgb = true }) {
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  const g = c.getContext('2d'); const im = g.createImageData(size, size);
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    let n = 0, a = 0.5, f = scale;
-    for (let o = 0; o < oct; o++) {
-      const py = Math.max(1, Math.round(f * stretch));
-      n += a * pnoise(x / size * f, y / size * py, f, py); f *= 2; a *= 0.5;
-    }
-    const d = (n - 0.5) * v * 2, i = (y * size + x) * 4;
-    im.data[i] = base[0] + d; im.data[i + 1] = base[1] + d; im.data[i + 2] = base[2] + d; im.data[i + 3] = 255;
-  }
-  g.putImageData(im, 0, 0);
-  if (paint) paint(g, size);
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); t.anisotropy = 4;
-  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
+import { makeTex } from './textures.js';
 const std = (map, o = {}) => new THREE.MeshStandardMaterial({ map, roughness: 0.9, ...o });
 
 /* ---------- terrain definition ---------- */
@@ -51,8 +24,8 @@ export { WATER_Y, LOCATIONS };
 const POOL = { x: 0, z: -38 };
 const WALL_Z = -47; // front face of the cliff
 export function terrainHeight(x, z) {
-  const d = Math.hypot(x, z + 22);                                   // the camp sits in a small rocky bowl
-  let h = (fbm(x * 0.03, z * 0.03) - 0.4) * 8 * sstep(30, 70, d) + sstep(27, 35, d) * (13 + fbm(x * 0.08, z * 0.08) * 9) + (fbm(x * 0.15, z * 0.15) - 0.5) * 0.25;
+  const d = Math.hypot(x, (z + 24) * 0.85);                           // the camp sits in a small rocky bowl
+  let h = (fbm(x * 0.03, z * 0.03) - 0.4) * 8 * sstep(30, 70, d) + sstep(21, 29, d) * (13 + fbm(x * 0.08, z * 0.08) * 9) + (fbm(x * 0.15, z * 0.15) - 0.5) * 0.25;
   const pd = Math.hypot(x - POOL.x, z - POOL.z);
   const bowl = 1 - sstep(4, 9.5, pd);
   const channel = (1 - sstep(2.5, 3.5, Math.abs(x))) * sstep(-34, -38, z);
@@ -255,7 +228,7 @@ export function buildWorld(scene) {
   solid(desk, 0.05);
 
   // Supply stack
-  const supplies = new THREE.Group(); supplies.position.set(-15.5, 0, -5);
+  const supplies = new THREE.Group(); supplies.position.set(-14, 0, -8);
   supplies.add(box(1.4, 0.14, 1.4, M.wood, 0, 0.07, 0));
   supplies.add(box(0.62, 0.5, 0.62, M.wood, -0.33, 0.39, -0.3)); supplies.add(box(0.62, 0.5, 0.62, M.wood, 0.34, 0.39, -0.28));
   supplies.add(box(0.62, 0.5, 0.62, M.wood, -0.3, 0.39, 0.34)); supplies.add(box(0.6, 0.5, 0.6, M.wood, 0.0, 0.89, 0));
@@ -286,15 +259,15 @@ export function buildWorld(scene) {
   const crowns = [[1.9, 2.4, 2.3], [1.5, 2.2, 3.5], [1.05, 2.0, 4.6]].map(([r, h, y]) => { const c = new THREE.ConeGeometry(r, h, 8); c.translate(0, y, 0); return paintGeo(c, [0.07, 0.17, 0.1]); });
   const treeG = mergeGeometries([trunkG, ...crowns]);
   const treeSpots = scatter(treeG, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }), 28, 1500,
-    (x, z) => Math.hypot(x, z + 22) > 37 && Math.hypot(x, z + 22) < 62 && z > WALL_Z + 3 && slopeAt(x, z) < 0.6,
+    (x, z) => Math.hypot(x, (z + 24) * 0.85) > 25 && Math.hypot(x, (z + 24) * 0.85) < 50 && z > WALL_Z + 3 && slopeAt(x, z) < 0.6,
     (x, z) => { const s = 0.8 + R() * 0.9; return { y: terrainHeight(x, z) - 0.1, sx: s, sy: s, sz: s }; });
   treeSpots.forEach(([x, z]) => colliders.push({ minX: x - 0.3, maxX: x + 0.3, minZ: z - 0.3, maxZ: z + 0.3, minY: -50, maxY: 50 }));
   scatter(new THREE.IcosahedronGeometry(0.8, 1), new THREE.MeshStandardMaterial({ color: 0x20381f, roughness: 1, flatShading: true }), 30, 600,
-    (x, z) => free(x, z, 14) && Math.hypot(x, z + 22) < 40 && slopeAt(x, z) < 0.6, (x, z) => { const s = 0.5 + R() * 0.8; return { y: terrainHeight(x, z) + 0.25 * s, sx: s * 1.3, sy: s * 0.7, sz: s * 1.3 }; });
+    (x, z) => free(x, z, 14) && Math.hypot(x, (z + 24) * 0.85) < 24 && slopeAt(x, z) < 0.6, (x, z) => { const s = 0.5 + R() * 0.8; return { y: terrainHeight(x, z) + 0.25 * s, sx: s * 1.3, sy: s * 0.7, sz: s * 1.3 }; });
   const rg = new THREE.IcosahedronGeometry(1, 1), rp = rg.attributes.position;
   for (let i = 0; i < rp.count; i++) { const k = 0.75 + hash2(rp.getX(i) * 9, rp.getZ(i) * 9 + rp.getY(i) * 5) * 0.5; rp.setXYZ(i, rp.getX(i) * k, rp.getY(i) * k * 0.8, rp.getZ(i) * k); }
   rg.computeVertexNormals();
-  scatter(rg, M.rock, 55, 1200, (x, z) => (Math.hypot(x, z + 22) < 38) && (Math.hypot(x, z + 10) > 9) && z > WALL_Z + 1.5 && Math.hypot(x - POOL.x, z - POOL.z) > 9.8 && !(Math.abs(x) < 2.5 && z < 8 && z > -27),
+  scatter(rg, M.rock, 55, 1200, (x, z) => (Math.hypot(x, (z + 24) * 0.85) < 30) && (Math.hypot(x, z + 10) > 9) && z > WALL_Z + 1.5 && Math.hypot(x - POOL.x, z - POOL.z) > 9.8 && !(Math.abs(x) < 2.5 && z < 8 && z > -27),
     (x, z) => { const s = 0.25 + R() * R() * 1.6; return { y: terrainHeight(x, z) + s * 0.3, sx: s * 1.2, sy: s, sz: s * 1.1, rx: R(), rz: R() }; });
 
   /* --- API --- */
@@ -305,7 +278,7 @@ export function buildWorld(scene) {
   };
   const hemiBase = hemi.intensity, sunBase = sun.intensity, fogOut = new THREE.Color(FOG), fogIn = new THREE.Color(0x03070a);
   return {
-    colliders, groundHeight, terrain: terrainHeight, cave, caveZ: CAVE_Z, bound: 60, spawn: { x: 0, z: 2, yaw: 0 }, stats: cave.stats,
+    colliders, groundHeight, terrain: terrainHeight, cave, caveZ: CAVE_Z, anchors: { table: [-9, 1.0, -12.4], lockers: [-10.6, 1.0, -15.1], terminal: [10, 1.05, -13.85] }, bound: 60, spawn: { x: 0, z: -4, yaw: 0 }, stats: cave.stats,
     update(dt, camera) {
       sky.position.copy(camera.position); stars.position.copy(camera.position); moon.position.copy(camera.position).addScaledVector(moonDir, 400);
       T.water.offset.x += dt * 0.012; T.water.offset.y += dt * 0.007;

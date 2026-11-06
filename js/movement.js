@@ -12,7 +12,7 @@ export class FirstPersonController {
     this.pos = { x: world.spawn.x, y: world.groundHeight(world.spawn.x, world.spawn.z, 5), z: world.spawn.z };
     this.vel = { x: 0, y: 0, z: 0 };
     this.yaw = world.spawn.yaw; this.pitch = 0;
-    this.eye = STAND_EYE; this.crouching = false; this.onGround = true; this.swimming = false; this.fly = false;
+    this.eye = STAND_EYE; this.crouching = false; this.onGround = true; this.swimming = false; this.fly = false; this.event = null; this.minZ = -1e9;
     this.keys = new Set(); this.bobT = 0; this.fovKick = 0; this.speed = 0; this.sprinting = false; this.locked = false;
 
     addEventListener('keydown', e => { if (!this.locked) return; this.keys.add(e.code); if (e.code === 'Space') e.preventDefault(); });
@@ -35,7 +35,7 @@ export class FirstPersonController {
   // Land collision. Applies whether grounded or airborne, so jumping cannot bypass walls, cliffs or water rules.
   blocked(nx, nz, fromX, fromZ) {
     const w = this.world, y = this.pos.y;
-    if (nz > 60 || (nz > w.caveZ && Math.abs(nx) > w.bound)) return true;
+    if (nz > 60 || nz < this.minZ || (nz > w.caveZ && Math.abs(nx) > w.bound)) return true;
     const g1 = w.groundHeight(nx, nz, y), g0 = w.groundHeight(fromX, fromZ, y);
     if (g1 < -50) return true;                                                                // no floor there (solid rock face)
     if (g1 > y + 0.6) return true;                                                            // cannot step or jump up more than 0.6 m
@@ -70,10 +70,10 @@ export class FirstPersonController {
     if (this.fly) return this.updateFly(dt, k);
     const w = this.world, g = w.groundHeight(this.pos.x, this.pos.z, this.pos.y);
     if (!this.swimming && this.pos.y <= WATER_LEVEL - 0.05 && g < WATER_LEVEL - 1.0) {       // deep water: start swimming
-      this.swimming = true; this.pos.y += this.eye; this.eye = 0;                              // position becomes the diver's centre (camera height)
+      this.swimming = true; this.event = 'enter'; this.pos.y += this.eye; this.eye = 0;                              // position becomes the diver's centre (camera height)
       this.vel.x *= 0.3; this.vel.z *= 0.3; this.vel.y = Math.min(this.vel.y, 0) * 0.3;
     } else if (this.swimming && g > -50 && WATER_LEVEL - g < 0.9) {                           // shallow enough to stand: wade out
-      this.eye = Math.max(0.5, Math.min(STAND_EYE, this.pos.y - g)); this.pos.y = g; this.vel.y = 0; this.swimming = false; this.onGround = true;
+      this.eye = Math.max(0.5, Math.min(STAND_EYE, this.pos.y - g)); this.pos.y = g; this.vel.y = 0; this.swimming = false; this.onGround = true; this.event = 'exit';
     }
     if (this.swimming) swimUpdate(this, dt, k); else this.landUpdate(dt, k);
     this.cameraUpdate(dt);

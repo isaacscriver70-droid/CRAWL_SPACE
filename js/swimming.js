@@ -7,6 +7,7 @@ const HEAD_OUT = 0.25;                     // eye height above the water surface
 
 function free(c, x, y, z) {
   const w = c.world;
+  if (z < c.minZ) return false;
   if (z < w.caveZ) return w.cave.sdf(x, y, z) > SWIM_RADIUS;
   if (Math.abs(x) > w.bound || z > 60) return false;
   if (y - w.terrain(x, z) < 0.35) return false;                      // pool / shore floor

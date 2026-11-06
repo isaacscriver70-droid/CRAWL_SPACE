@@ -28,8 +28,9 @@ $('btn-new').addEventListener('click', () => {
   if (progress.data && !confirm('Start a new expedition? Your saved progress will be overwritten.')) return;
   const r = newExpedition();
   if (!r.ok) { toast(`Could not create save: ${r.error}`, 'error'); return; }
-  location.href = 'game.html';
+  location.href = 'game.html?intro=1';
 });
+$('btn-tutorial').addEventListener('click', () => { location.href = 'tutorial.html'; });
 $('btn-settings').addEventListener('click', () => { buildSettingsPanel($('settings-body')); openModal('modal-settings'); });
 $('btn-credits').addEventListener('click', () => openModal('modal-credits'));
 $('btn-fullscreen').addEventListener('click', () => {

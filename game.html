@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>CRAWLSPACE - Expedition</title>
+  <link rel="stylesheet" href="css/menu.css">
   <link rel="stylesheet" href="css/game.css">
   <script type="importmap">
   { "imports": {
@@ -20,16 +21,32 @@
     <div class="row"><span>AIR</span><div class="bar"><i id="o2bar"></i></div><b id="o2txt"></b></div>
     <div class="row"><span>DEPTH</span><b id="depth"></b></div>
     <div class="row"><span>PRESSURE</span><b id="press"></b></div>
+    <div class="row"><span>LIGHT</span><b id="light"></b></div>
     <div id="warn"></div>
   </div>
   <a class="back" href="index.html">Main Menu</a>
   <div id="loading"><div id="loading-text">Loading expedition…</div></div>
   <div id="start" hidden>
-    <h2>The Hollow Expedition Base</h2>
-    <p id="controls-list"></p>
-    <p>Swim into the cave through the pool. Space = swim up, C = swim down, F = light.</p>
-    <div class="hint">Click to begin</div>
+    <h2>The Hollow Expedition</h2>
+    <p>Swim into the cave through the pool below the cliff. Look around the camp first: the lockers, the prep table and the survey terminal are usable.</p>
+    <nav>
+      <button id="btn-resume">Begin</button>
+      <button id="btn-settings">Settings</button>
+      <button id="btn-controls">Controls</button>
+      <a class="btn" href="index.html">Return to Main Menu</a>
+    </nav>
   </div>
+  <div id="prompt"></div>
+  <div id="fade"></div>
+  <button id="cin-skip" hidden>Skip intro</button>
+  <div id="subs" class="subs" hidden></div>
+  <div class="modal" id="panel-note" hidden><div class="panel"><h2 id="note-title"></h2><p id="note-body" style="line-height:1.6"></p><p><button data-close>Close</button></p></div></div>
+  <div id="ending" hidden><h2 id="ending-title"></h2><p id="ending-text"></p><p><a class="btn" href="index.html">Main Menu</a> <button id="btn-keep">Keep exploring</button></p></div>
+  <div class="modal" id="panel-equip" hidden><div class="panel"><h2>Equipment</h2><div id="equip-body"></div><p><button data-close>Close</button></p></div></div>
+  <div class="modal" id="panel-brief" hidden><div class="panel"><h2>Expedition Briefing</h2><div id="brief-body"></div><p><button data-close>Close</button></p></div></div>
+  <div class="modal" id="panel-map" hidden><div class="panel" style="text-align:center"><h2>Cave Survey</h2><canvas id="map-canvas" width="430" height="640" style="max-width:100%;border:1px solid #1d4651"></canvas><p><small>Only areas you have passed through are drawn.</small></p><p><button data-close>Close</button></p></div></div>
+  <div class="modal" id="modal-settings" hidden><div class="panel"><h2>Settings</h2><div id="settings-body"></div><p><button data-close>Close</button></p></div></div>
+  <div class="modal" id="modal-controls" hidden><div class="panel"><h2>Controls</h2><div id="controls-body"></div><p><button data-close>Close</button></p></div></div>
   <div id="dead" hidden>
     <h2>EXPEDITION LOST</h2>
     <p>You ran out of air.</p>

@@ -25,3 +25,25 @@ body.playing #hud { display:block; }
 #dead { position:fixed; inset:0; z-index:9; background:rgba(0,0,0,.9); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.6rem; letter-spacing:.2em; text-transform:uppercase; }
 #dead h2 { color:#d0453f; font-weight:400; font-size:2.4rem; margin:0; } #dead p { margin:.3rem; text-transform:none; letter-spacing:.1em; }
 .btn { display:inline-block; color:#c9dde2; text-decoration:none; border:1px solid #1d4651; padding:.6rem 1.2rem; margin:0 .4rem; background:rgba(10,30,36,.8); text-transform:uppercase; }
+
+#prompt { position:fixed; left:50%; top:60%; transform:translateX(-50%); z-index:4; font:600 .95rem system-ui,sans-serif; color:#e9f6f8; background:rgba(2,12,16,.7); border:1px solid #2f6c78; padding:.4rem .9rem; opacity:0; transition:opacity .15s; pointer-events:none; letter-spacing:.04em; }
+#start nav { display:flex; flex-direction:column; gap:.5rem; width:min(300px,80vw); margin-top:.6rem; }
+#start nav .btn { text-align:center; margin:0; }
+.panel .item { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.55rem 0; border-bottom:1px solid #14343c; }
+.panel .item small { color:#8fb0b8; }
+.panel .row { grid-template-columns:1fr auto; }
+.panel .row b { color:#e9f6f8; }
+.modal { z-index:12; }
+
+.subs { position:fixed; left:50%; bottom:9%; transform:translateX(-50%); z-index:6; max-width:min(780px,90vw); text-align:center; background:rgba(0,0,0,.62); padding:.5rem 1rem; line-height:1.4; color:#f2f2ea; font-family:system-ui,sans-serif; border-radius:2px; }
+.subs b { display:block; color:#e6c46a; font-size:.75em; letter-spacing:.1em; text-transform:uppercase; margin-bottom:.15rem; }
+.subs.small { font-size:.95rem; } .subs.medium { font-size:1.2rem; } .subs.large { font-size:1.6rem; }
+#ending { position:fixed; inset:0; z-index:11; background:rgba(2,7,10,.94); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:2rem; gap:1rem; }
+#ending h2 { font-weight:400; letter-spacing:.3em; font-size:2.2rem; margin:0; } #ending p { max-width:60ch; line-height:1.6; color:#b8d0d6; }
+
+#tutorial { position:fixed; top:1rem; left:50%; transform:translateX(-50%); z-index:5; width:min(520px,92vw); background:rgba(2,12,16,.82); border:1px solid #2f6c78; padding:.7rem 1rem; text-align:center; font-family:system-ui,sans-serif; }
+#tutorial small { color:#6fa3ad; letter-spacing:.12em; text-transform:uppercase; display:block; } #tutorial b { display:block; color:#e9f6f8; font-size:1.05rem; margin:.15rem 0; } #tutorial p { margin:.2rem 0 .5rem; color:#bcd5da; line-height:1.4; }
+#tutorial .btn { font-size:.75rem; padding:.3rem .7rem; }
+
+#fade { position:fixed; inset:0; background:#000; opacity:0; pointer-events:none; z-index:7; }
+#cin-skip { position:fixed; right:1.2rem; bottom:1.2rem; z-index:8; font-size:.8rem; padding:.4rem .9rem; }
